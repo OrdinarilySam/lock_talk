@@ -1,35 +1,41 @@
-mod galois;
-mod sbox;
+mod encryption;
+mod decryption;
+mod util;
 
-use galois::*;
-use sbox::*;
+use encryption::*;
+use decryption::*;
+use util::*;
 
-use std::fmt::{Display, Error, Formatter};
 
-struct ByteVec(Vec<u8>);
 
-impl Display for ByteVec {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        let mut comma_separated = String::new();
+// use std::fmt::{Display, Error, Formatter};
 
-        for num in &self.0[0..self.0.len() - 1] {
-            let value = format!("{:02x}", num);
-            comma_separated.push_str(&value);
-            comma_separated.push_str(", ");
-        }
+// struct ByteVec(Vec<u8>);
 
-        let value = format!("{:02x}", &self.0[self.0.len() - 1]);
-        comma_separated.push_str(&value);
-        write!(f, "[{}]", comma_separated)
-    }
-}
+// impl Display for ByteVec {
+//     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+//         let mut comma_separated = String::new();
+
+//         for num in &self.0[0..self.0.len() - 1] {
+//             let value = format!("{:02x}", num);
+//             comma_separated.push_str(&value);
+//             comma_separated.push_str(", ");
+//         }
+
+//         let value = format!("{:02x}", &self.0[self.0.len() - 1]);
+//         comma_separated.push_str(&value);
+//         write!(f, "[{}]", comma_separated)
+//     }
+// }
 
 /* ----------- ENCRYPTION AND DECRYPTION ------------ */
 fn cipher(input: Vec<u8>, num_rounds: u8, key_schedule: &Vec<Vec<u8>>) -> Vec<u8> {
+    let num_rounds = num_rounds as usize;
+
     let mut state = input;
     state = add_round_key(state, &key_schedule[0..4]);
 
-    for round in 1..num_rounds as usize {
+    for round in 1..num_rounds {
         state = sub_bytes(state);
         state = shift_rows(state);
         state = mix_columns(state);
@@ -38,7 +44,6 @@ fn cipher(input: Vec<u8>, num_rounds: u8, key_schedule: &Vec<Vec<u8>>) -> Vec<u8
     // don't mix columns in final round
     state = sub_bytes(state);
     state = shift_rows(state);
-    let num_rounds = num_rounds as usize;
     state = add_round_key(state, &key_schedule[num_rounds * 4..num_rounds * 4 + 4]);
     state
 }
@@ -86,63 +91,24 @@ fn key_expansion(key: Vec<u8>) -> Vec<Vec<u8>> {
     key_schedule
 }
 
-/* ----------- ENCRYPTION FUNCTIONS ------------ */
-fn add_round_key(mut state: Vec<u8>, round_key: &[Vec<u8>]) -> Vec<u8> {
-    for column in 0..4 {
-        for row in 0..4 {
-            state[row + column * 4] ^= round_key[column][row];
-        }
+
+fn inv_cipher(input: Vec<u8>, num_rounds: u8, key_schedule: &Vec<Vec<u8>>) -> Vec<u8> {
+    let mut state = input;
+    let num_rounds = num_rounds as usize;
+    state = add_round_key(state, &key_schedule[4*num_rounds..4*(num_rounds+1)]);
+    for round in (1..num_rounds).rev() {
+        state = inv_shift_rows(state);
+        state = inv_sub_bytes(state);
+        state = add_round_key(state, &key_schedule[4*round..4*(round+1)]);
+        state = inv_mix_columns(state);
     }
+    state = inv_shift_rows(state);
+    state = inv_sub_bytes(state);
+    state = add_round_key(state, &key_schedule[0..4]);
     state
 }
 
-fn sub_bytes(mut state: Vec<u8>) -> Vec<u8> {
-    for i in 0..state.len() {
-        state[i] = s_box(state[i]);
-    }
-    state
-}
 
-fn shift_rows(mut state: Vec<u8>) -> Vec<u8> {
-    // skip the first row
-    for row in 1..4 {
-        let mut new_row = Vec::new();
-        for column in 0..4 {
-            let new_column = (row + column) % 4;
-            new_row.push(state[row + new_column * 4]);
-        }
-        for column in 0..4 {
-            state[row + column * 4] = new_row[column];
-        }
-    }
-    state
-}
-
-fn mix_columns(mut state: Vec<u8>) -> Vec<u8> {
-    for column in 0..4 {
-        let s0 = state[column * 4];
-        let s1 = state[1 + column * 4];
-        let s2 = state[2 + column * 4];
-        let s3 = state[3 + column * 4];
-
-        // multiply the column elements by a fixed matrix
-        state[column * 4] = gf_mult(0x02, s0) ^ gf_mult(0x03, s1) ^ s2 ^ s3;
-        state[1 + column * 4] = s0 ^ gf_mult(0x02, s1) ^ gf_mult(0x03, s2) ^ s3;
-        state[2 + column * 4] = s0 ^ s1 ^ gf_mult(0x02, s2) ^ gf_mult(0x03, s3);
-        state[3 + column * 4] = gf_mult(0x03, s0) ^ s1 ^ s2 ^ gf_mult(0x02, s3);
-    }
-    state
-}
-
-fn rot_word(word: &[u8]) -> Vec<u8> {
-    let mut new_word: Vec<u8> = Vec::new();
-    for i in 0..word.len() {
-        new_word.push(word[(i + 1) % 4]);
-    }
-    new_word
-}
-
-/* ----------- DECRYPTION FUNCTIONS ------------ */
 
 /* ----------- TESTING ------------ */
 #[cfg(test)]
@@ -169,6 +135,30 @@ mod tests {
         let key_schedule = key_expansion(key);
         let output = cipher(input, 10, &key_schedule);
         assert_eq!(expected, output);
+    }
+
+    #[test]
+    fn inv_cipher_test_official() {
+        let expected: Vec<u8> = vec![
+            0x32, 0x43, 0xf6, 0xa8, 0x88, 0x5a, 0x30, 0x8d, 0x31, 0x31, 0x98, 0xa2, 0xe0, 0x37,
+            0x07, 0x34,
+        ];
+
+        let key: Vec<u8> = vec![
+            0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf,
+            0x4f, 0x3c,
+        ];
+
+        let input: Vec<u8> = vec![
+            0x39, 0x25, 0x84, 0x1d, 0x02, 0xdc, 0x09, 0xfb, 0xdc, 0x11, 0x85, 0x97, 0x19, 0x6a,
+            0x0b, 0x32,
+        ];
+
+        let key_schedule = key_expansion(key);
+        let output = inv_cipher(input, 10, &key_schedule);
+        assert_eq!(expected, output);
+
+
     }
 
     #[test]
