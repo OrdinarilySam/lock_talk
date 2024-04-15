@@ -29,7 +29,7 @@ use util::*;
 // }
 
 /* ----------- ENCRYPTION AND DECRYPTION ------------ */
-fn cipher(input: Vec<u8>, num_rounds: u8, key_schedule: &Vec<Vec<u8>>) -> Vec<u8> {
+pub fn cipher(input: Vec<u8>, num_rounds: u8, key_schedule: &Vec<Vec<u8>>) -> Vec<u8> {
     let num_rounds = num_rounds as usize;
 
     let mut state = input;
@@ -48,27 +48,18 @@ fn cipher(input: Vec<u8>, num_rounds: u8, key_schedule: &Vec<Vec<u8>>) -> Vec<u8
     state
 }
 
-fn key_expansion(key: Vec<u8>) -> Vec<Vec<u8>> {
-    let n_k: u8;
-    let n_r: u8;
-    match key.len() / 4 {
-        4 => {
-            n_k = 4;
-            n_r = 10;
-        }
-        6 => {
-            n_k = 6;
-            n_r = 12;
-        }
-        8 => {
-            n_k = 8;
-            n_r = 14;
-        }
-        _ => panic!("Invalid key size!"),
+pub fn key_expansion(key: Vec<u8>) -> Vec<Vec<u8>> {
+    let n_k = key.len() / 4;
+    let n_r: u8 = match n_k {
+        4 => 10,
+        6 => 12,
+        8 => 14,
+        _ => panic!("Invalid key size!")
     };
 
     let mut key_schedule: Vec<Vec<u8>> = Vec::new();
 
+    // fill in the first section with the key
     for word in 0..n_k as usize {
         let mut temp = Vec::new();
         for byte in 0..4 {
@@ -77,12 +68,13 @@ fn key_expansion(key: Vec<u8>) -> Vec<Vec<u8>> {
         key_schedule.push(temp);
     }
 
+    // calculate the rest of the sections
     for i in n_k as usize..4 * (n_r + 1) as usize {
         let mut temp = key_schedule[i - 1].clone();
-        if i as u8 % n_k == 0 {
+        if i % n_k == 0 {
             temp = sub_word(&rot_word(&temp[..])[..]);
             temp = gf_add_word(temp, r_con((i / n_k as usize) - 1));
-        } else if n_k > 6 && i as u8 % n_k == 4 {
+        } else if n_k > 6 && i % n_k == 4 {
             temp = sub_word(&temp[..]);
         }
         key_schedule.push(gf_add_word(key_schedule[i - n_k as usize].clone(), temp))
@@ -92,7 +84,7 @@ fn key_expansion(key: Vec<u8>) -> Vec<Vec<u8>> {
 }
 
 
-fn inv_cipher(input: Vec<u8>, num_rounds: u8, key_schedule: &Vec<Vec<u8>>) -> Vec<u8> {
+pub fn inv_cipher(input: Vec<u8>, num_rounds: u8, key_schedule: &Vec<Vec<u8>>) -> Vec<u8> {
     let mut state = input;
     let num_rounds = num_rounds as usize;
     state = add_round_key(state, &key_schedule[4*num_rounds..4*(num_rounds+1)]);

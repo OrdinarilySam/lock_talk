@@ -1,4 +1,5 @@
-mod crypto;
+pub mod crypto;
+use crypto::*;
 
 pub fn add(left: usize, right: usize) -> usize {
     left + right
