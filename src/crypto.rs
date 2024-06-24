@@ -47,7 +47,6 @@ pub fn aes_encrypt(input: Vec<u8>, key: Vec<u8>) -> Vec<u8> {
     cipher_text
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -6,28 +6,6 @@ use encryption::*;
 use decryption::*;
 use util::*;
 
-
-
-// use std::fmt::{Display, Error, Formatter};
-
-// struct ByteVec(Vec<u8>);
-
-// impl Display for ByteVec {
-//     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-//         let mut comma_separated = String::new();
-
-//         for num in &self.0[0..self.0.len() - 1] {
-//             let value = format!("{:02x}", num);
-//             comma_separated.push_str(&value);
-//             comma_separated.push_str(", ");
-//         }
-
-//         let value = format!("{:02x}", &self.0[self.0.len() - 1]);
-//         comma_separated.push_str(&value);
-//         write!(f, "[{}]", comma_separated)
-//     }
-// }
-
 /* ----------- ENCRYPTION AND DECRYPTION ------------ */
 pub fn cipher(input: Vec<u8>, num_rounds: u8, key_schedule: &Vec<Vec<u8>>) -> Vec<u8> {
     let num_rounds = num_rounds as usize;
