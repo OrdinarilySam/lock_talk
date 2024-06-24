@@ -6,7 +6,7 @@ pub fn aes_encrypt(input: Vec<u8>, key: Vec<u8>) -> Vec<u8> {
         6 => 12,
         8 => 14,
         _ => panic!("Invalid key length"),
-    };
+   };
 
     let key_schedule = aes::key_expansion(key);
 
@@ -46,6 +46,48 @@ pub fn aes_encrypt(input: Vec<u8>, key: Vec<u8>) -> Vec<u8> {
 
     cipher_text
 }
+
+pub fn aes_decrypt(input: Vec<u8>, key: Vec<u8>) -> Vec<u8> {
+    let num_rounds: u8 = match key.len() / 4 {
+        4 => 10,
+        6 => 12,
+        8 => 14,
+        _ => panic!("Invalid key length"),
+    };
+
+    if input.len() % 16 != 0 {
+        panic!("Invalid ciphertext length");
+    }
+    
+    let key_schedule = aes::key_expansion(key);
+
+    let mut plain_text: Vec<u8> = Vec::new();
+
+    let num_blocks = input.len() / 16;
+    for i in 0..num_blocks {
+        let mut block: Vec<u8> = Vec::new();
+        block.extend_from_slice(&input[i * 16..(i + 1) * 16]);
+
+        let mut decrypted = aes::inv_cipher(block, num_rounds, &key_schedule);
+        plain_text.append(&mut decrypted);
+    }
+
+    // find the padding
+    let padding_length = plain_text.last().unwrap();
+    let padding_start: usize = input.len() - (*padding_length as usize);
+    
+    let padding = plain_text.split_off(padding_start);
+
+    for (index, value) in padding.iter().enumerate() {
+        if (index + 1) != (*value as usize) {
+            panic!("Invalid padding")
+        }
+    }
+
+    plain_text
+}
+
+
 
 #[cfg(test)]
 mod tests {
@@ -161,6 +203,23 @@ mod tests {
             0xEA, 0x03, 0x2F, 0x33, 
             0xAF, 0x02, 0x3B, 0x61, 
         ];
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn decrypt_128bit_1pad() {
+        let key: Vec<u8> = vec![b'A'; 16];
+        let input: Vec<u8> = vec![
+            0xC5, 0x5B, 0xAD, 0xE2,
+            0xF2, 0xB3, 0x26, 0x4D,
+            0x4C, 0xA2, 0x8E, 0x59,
+            0xE9, 0x81, 0x38, 0x8A,
+        ];
+
+        let result = aes_decrypt(input, key);
+
+        let expected: Vec<u8> = vec![b'A'; 15];
 
         assert_eq!(result, expected);
     }
