@@ -325,5 +325,7 @@ mod tests {
     }
 
     #[test]
-    fn sub_bytes_test() {}
+    fn sub_bytes_test() {
+
+    }
 }
