@@ -77,7 +77,6 @@ pub fn aes_decrypt(input: Vec<u8>, key: Vec<u8>) -> Vec<u8> {
     let padding_start: usize = input.len() - (padding_length as usize);
     
     let padding = plain_text.split_off(padding_start);
-    println!("{:?}", padding);
 
     for value in padding.iter() {
         if padding_length != (*value) {
